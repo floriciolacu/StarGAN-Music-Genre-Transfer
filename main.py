@@ -1,16 +1,24 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import os
 
 
 def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+    print(f'Hi, {name}')
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    logs_directory = "stargan_songs/logs";
+    models_directory = "stargan_songs/models";
+    samples_directory = "stargan_songs/samples";
+    results_directory = "stargan_songs/results";
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    if not os.path.exists(logs_directory):
+        os.makedirs(logs_directory)
+
+    if not os.path.exists(models_directory):
+        os.makedirs(models_directory)
+
+    if not os.path.exists(samples_directory):
+        os.makedirs(samples_directory)
+        
+    if not os.path.exists(results_directory):
+        os.makedirs(results_directory)
