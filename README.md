@@ -1,1 +1,1 @@
-# StarGAN-Music-Style-Transfer
+# StarGAN-Music-Genre-Transfer
