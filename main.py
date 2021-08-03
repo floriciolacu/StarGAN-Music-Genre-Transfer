@@ -6,6 +6,7 @@ def print_hi(name):
 
 
 if __name__ == '__main__':
+    # directories
     logs_directory = "stargan_songs/logs";
     models_directory = "stargan_songs/models";
     samples_directory = "stargan_songs/samples";
