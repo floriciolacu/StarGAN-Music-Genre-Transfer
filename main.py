@@ -8,13 +8,11 @@ from sklearn.preprocessing import LabelBinarizer
 from torch.utils.data.dataloader import DataLoader
 
 class AudioDataset(Dataset):
-    """docstring for AudioDataset."""
     def __init__(self, datadir:str):
         super(AudioDataset, self).__init__()
         self.datadir = datadir
         self.files = librosa.util.find_files(datadir, ext='npy')
         self.encoder = LabelBinarizer().fit(styles)
-        # print(styles)
 
     def __getitem__(self, idx):
         p = self.files[idx]
@@ -23,8 +21,6 @@ class AudioDataset(Dataset):
         label = self.encoder.transform([style])[0]
         mid = np.load(p)*1.
         mid = torch.FloatTensor(mid)
-        # mid = torch.unsqueeze(mid, 0)
-        # print(style)
         return mid, torch.tensor(styles.index(style), dtype=torch.long), torch.FloatTensor(label)
 
     def speaker_encoder(self):
@@ -241,17 +237,11 @@ if __name__ == '__main__':
     if not os.path.exists(args.results_directory):
         os.makedirs(args.results_directory)
 
-    # Data loader.
-    # dloader = data_loader(config.data_dir, batch_size=config.batch_size, mode=config.mode,
-    #                       num_workers=config.num_workers)
-    # print(dloader)
-
     styles = get_styles('./data/rock_bossanova_funk_RnB')
     dataset = AudioDataset(args.dataset_directory)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-    # print(loader)
 
-    # # Solver for training and testing StarGAN.
+    # Solver for training and testing StarGAN.
     # solver = Solver(dloader, config)
 
     if args.type == "train":
