@@ -2,9 +2,48 @@ import os
 import argparse
 from torch.backends import cudnn
 import tensorflow as tf
+from torch.utils.data.dataset import Dataset
+import librosa
+from sklearn.preprocessing import LabelBinarizer
+from torch.utils.data.dataloader import DataLoader
+
+class AudioDataset(Dataset):
+    """docstring for AudioDataset."""
+    def __init__(self, datadir:str):
+        super(AudioDataset, self).__init__()
+        self.datadir = datadir
+        self.files = librosa.util.find_files(datadir, ext='npy')
+        self.encoder = LabelBinarizer().fit(styles)
+        # print(styles)
+
+    def __getitem__(self, idx):
+        p = self.files[idx]
+        filename = os.path.basename(p)
+        style = filename.split(sep='_', maxsplit=1)[0]
+        label = self.encoder.transform([style])[0]
+        mid = np.load(p)*1.
+        mid = torch.FloatTensor(mid)
+        # mid = torch.unsqueeze(mid, 0)
+        # print(style)
+        return mid, torch.tensor(styles.index(style), dtype=torch.long), torch.FloatTensor(label)
+
+    def speaker_encoder(self):
+        return self.encoder
+
+    def __len__(self):
+        return len(self.files)
 
 def str2bool(v):
     return v.lower() in ('true')
+
+def get_styles(dataset_train: str, styles = []):
+    if '_' in dataset_train:
+        dt = dataset_train.rsplit('_', maxsplit=1)
+        styles.append(dt[1])
+        get_styles(dt[0],styles)
+    else:
+        styles.append(dataset_train.rsplit('/', maxsplit=1)[1])
+    return list(reversed(styles))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -206,7 +245,12 @@ if __name__ == '__main__':
     # dloader = data_loader(config.data_dir, batch_size=config.batch_size, mode=config.mode,
     #                       num_workers=config.num_workers)
     # print(dloader)
-    #
+
+    styles = get_styles('./data/rock_bossanova_funk_RnB')
+    dataset = AudioDataset(args.dataset_directory)
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    # print(loader)
+
     # # Solver for training and testing StarGAN.
     # solver = Solver(dloader, config)
 
