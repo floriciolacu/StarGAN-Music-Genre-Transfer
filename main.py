@@ -1,11 +1,10 @@
+from torch.backends import cudnn
 import os
 import argparse
-from torch.backends import cudnn
-import tensorflow as tf
 from torch.utils.data.dataset import Dataset
-import librosa
-from sklearn.preprocessing import LabelBinarizer
 from torch.utils.data.dataloader import DataLoader
+from sklearn.preprocessing import LabelBinarizer
+import librosa
 from StarGAN import *
 
 

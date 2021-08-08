@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model import Discriminator, Classifier, Generator
 import random
 from sklearn.preprocessing import LabelBinarizer
 import librosa
 import ast
+from model import Generator, Discriminator, Classifier
 
 
 def get_styles(dataset_train: str, styles = []):
