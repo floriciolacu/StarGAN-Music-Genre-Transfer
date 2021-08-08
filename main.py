@@ -173,6 +173,12 @@ if __name__ == '__main__':
         help='test model from this step',
     )
     parser.add_argument(
+        '--classifier_iters',
+        type=int,
+        default=200000,
+        help='classifier model from this step',
+    )
+    parser.add_argument(
         '--source_style',
         type=str,
         default=None,

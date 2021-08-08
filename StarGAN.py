@@ -1,14 +1,11 @@
 import os
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import tensorflow as tf
 import pretty_midi
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-from torchvision.utils import save_image
 from model import Discriminator, Classifier, Generator
 import random
 from sklearn.preprocessing import LabelBinarizer
@@ -214,6 +211,7 @@ class StarGAN(object):
         self.beta2 = args.beta2
         self.resume_iters = args.resume_iters
 
+        self.classifier_iters = args.classifier_iters
         self.test_iters = args.test_iters
         self.target_style = ast.literal_eval(args.target_style)
         self.source_style = args.source_style
@@ -545,6 +543,8 @@ class StarGAN(object):
 
     def classify(self):
         print("Classify files from directory " + str(self.classify_directory))
+        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_iters))
+        self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
         p = os.path.join(self.classify_directory)
         npyfiles = librosa.util.find_files(p, ext='npy')
         res = {}
