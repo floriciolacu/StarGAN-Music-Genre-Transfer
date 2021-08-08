@@ -6,6 +6,8 @@ from torch.utils.data.dataset import Dataset
 import librosa
 from sklearn.preprocessing import LabelBinarizer
 from torch.utils.data.dataloader import DataLoader
+from StarGAN import *
+
 
 class AudioDataset(Dataset):
     def __init__(self, datadir:str):
@@ -23,14 +25,13 @@ class AudioDataset(Dataset):
         mid = torch.FloatTensor(mid)
         return mid, torch.tensor(styles.index(style), dtype=torch.long), torch.FloatTensor(label)
 
-    def speaker_encoder(self):
-        return self.encoder
-
     def __len__(self):
         return len(self.files)
 
+
 def str2bool(v):
     return v.lower() in ('true')
+
 
 def get_styles(dataset_train: str, styles = []):
     if '_' in dataset_train:
@@ -41,11 +42,11 @@ def get_styles(dataset_train: str, styles = []):
         styles.append(dataset_train.rsplit('/', maxsplit=1)[1])
     return list(reversed(styles))
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('-f')
 
-    # Directories.
     parser.add_argument(
         '--dataset_directory',
         type=str,
@@ -55,6 +56,11 @@ if __name__ == '__main__':
         '--test_directory',
         type=str,
         default='data/test',
+    )
+    parser.add_argument(
+        '--classify_directory',
+        type=str,
+        default='data/test1/rock',
     )
     parser.add_argument(
         '--logs_directory',
@@ -76,7 +82,6 @@ if __name__ == '__main__':
         type=str,
         default='stargan_songs/results',
     )
-
     parser.add_argument(
         '--cycle_loss_weight',
         type=float,
@@ -101,8 +106,6 @@ if __name__ == '__main__':
         default=0.1,
         help='sigma of gaussian noise for discriminators',
     )
-
-    # Train
     parser.add_argument(
         '--batch_size',
         type=int,
@@ -163,8 +166,6 @@ if __name__ == '__main__':
         default=None,
         help='resume training from this step',
     )
-
-    # Test
     parser.add_argument(
         '--test_iters',
         type=int,
@@ -183,7 +184,6 @@ if __name__ == '__main__':
         default="['rock', 'bossanova']",
         help='string list of target styles eg."[a,b]"',
     )
-
     parser.add_argument(
         '--num_workers',
         type=int,
@@ -195,13 +195,11 @@ if __name__ == '__main__':
         default='train',
         choices=['train', 'test', 'classify'],
     )
-    # parser.add_argument(
-    #     '--use_tensorboard',
-    #     type=str2bool,
-    #     default=True,
-    # )
-
-    # Steps
+    parser.add_argument(
+        '--use_tensorboard',
+        type=str2bool,
+        default=True,
+    )
     parser.add_argument(
         '--log_freq',
         type=int,
@@ -241,19 +239,18 @@ if __name__ == '__main__':
     dataset = AudioDataset(args.dataset_directory)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
-    # Solver for training and testing StarGAN.
-    # solver = Solver(dloader, config)
-
     if args.type == "train":
         print("train")
-        # model = CycleGAN(args)
-        # model.train(args) if args.phase == "train" else model.test(args)
+        model = StarGAN(loader, args)
+        model.train()
 
     if args.type == "test":
         print("test")
-        # classifier = Classifier(args)
+        model = StarGAN(loader, args)
+        model.test()
 
     if args.type == "classify":
         print("classify")
-        # code
+        model = StarGAN(loader, args)
+        model.classify()
 
