@@ -1,23 +1,24 @@
 import os
+import random
+import numpy as np
 from datetime import datetime
 import tensorflow as tf
 import pretty_midi
-import numpy as np
+import librosa
+import ast
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
+
 from sklearn.preprocessing import LabelBinarizer
-import librosa
-import ast
 from model import Generator, Discriminator, Classifier
 
 
 def get_styles(dataset_train: str, styles = []):
     if '_' in dataset_train:
-        dt = dataset_train.rsplit('_', maxsplit=1)
-        styles.append(dt[1])
-        get_styles(dt[0],styles)
+        dataset_train = dataset_train.rsplit('_', maxsplit=1)
+        styles.append(dataset_train[1])
+        get_styles(dataset_train[0],styles)
     else:
         styles.append(dataset_train.rsplit('/', maxsplit=1)[1])
     return list(reversed(styles))
@@ -44,8 +45,6 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
         if idx == 0:
             instrument_program = pretty_midi.instrument_name_to_program('Electric Guitar (clean)')
             instrument = pretty_midi.Instrument(program=instrument_program, is_drum=is_drum[idx])
-            # set_piano_roll_to_instrument(images_with_pause_list[idx], instrument, 100, tempo, 4)
-            # def set_piano_roll_to_instrument(piano_roll, instrument, velocity=100, tempo=120.0, beat_resolution=16):
             piano_roll = images_with_pause_list[idx]
             tpp = 60.0 / tempo / float(4)
             threshold = 60.0 / tempo / 4
@@ -188,9 +187,9 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
 
 
 class StarGAN(object):
-    def __init__(self, loader, args):
+    def __init__(self, dataset_loader, args):
         self.args = args
-        self.loader = loader
+        self.dataset_loader = dataset_loader
 
         self.cycle_loss_weight = args.cycle_loss_weight
         self.domclass_loss_weight = args.domclass_loss_weight
@@ -235,21 +234,17 @@ class StarGAN(object):
         self.C = Classifier()
 
         self.generator_optimizer = torch.optim.Adam(self.G.parameters(), self.generator_lr, [self.beta1, self.beta2])
-        self.discriminator_optimizer = torch.optim.Adam(self.D.parameters(), self.discriminator_lr,
-                                                        [self.beta1, self.beta2])
+        self.discriminator_optimizer = torch.optim.Adam(self.D.parameters(), self.discriminator_lr, [self.beta1, self.beta2])
         self.classifier_optimizer = torch.optim.Adam(self.C.parameters(), self.classifier_lr, [self.beta1, self.beta2])
 
-        networks = [self.G, self.D, self.C]
-        for n in networks:
-            num_params = 0
-            for p in n.parameters():
-                num_params += p.numel()
-            print(n)
-            print("The number of parameters: {}".format(num_params))
+        # print(self.G)
+        # print(self.D)
+        # print(self.C)
 
         self.G.to(self.device)
         self.D.to(self.device)
         self.C.to(self.device)
+
         if self.use_tensorboard:
             self.writer = tf.summary.create_file_writer(self.logs_directory)
 
@@ -258,32 +253,25 @@ class StarGAN(object):
         discriminator_lr = self.discriminator_lr
         classifier_lr = self.classifier_lr
 
-        start_iters = 0
+        start_epochs = 0
         if self.resume_epochs:
             pass
 
-        # norm = Normalizer()
-        data_iter = iter(self.loader)
+        data = iter(self.dataset_loader)
 
-        print('Start training......')
+        print('Training started')
         start_time = datetime.now()
 
-        for i in range(start_iters, self.epochs):
-            # =================================================================================== #
-            #                             1. Preprocess input data                                #
-            # =================================================================================== #
-            # Fetch real images and labels.
+        for i in range(start_epochs, self.epochs):
             try:
-                x_real, style_idx_org, label_org = next(data_iter)
+                x_real, style_idx_org, label_org = next(data)
             except:
-                data_iter = iter(self.loader)
-                x_real, style_idx_org, label_org = next(data_iter)
+                data = iter(self.dataset_loader)
+                x_real, style_idx_org, label_org = next(data)
 
-                # generate gaussian noise for robustness improvement
-
+            # generate gaussian noise for robustness improvement
             gaussian_noise = self.sigma_d * torch.randn(x_real.size())
 
-            # Generate target domain labels randomly.
             rand_idx = torch.randperm(label_org.size(0))
             label_trg = label_org[rand_idx]
             style_idx_trg = style_idx_org[rand_idx]
@@ -294,13 +282,9 @@ class StarGAN(object):
             style_idx_org = style_idx_org.to(self.device)  # Original domain labels
             style_idx_trg = style_idx_trg.to(self.device)  # Target domain labels
             gaussian_noise = gaussian_noise.to(self.device)  # gaussian noise for discriminators
-            # =================================================================================== #
-            #                             2. Train the discriminator                              #
-            # =================================================================================== #
-            # Compute loss with real audio frame.
+
             CELoss = nn.CrossEntropyLoss()
             cls_real = self.C(x_real)
-            # print(x_real.shape)
             cls_loss_real = CELoss(input=cls_real, target=style_idx_org)
 
             self.generator_optimizer.zero_grad()
@@ -309,13 +293,11 @@ class StarGAN(object):
 
             cls_loss_real.backward()
             self.classifier_optimizer.step()
-            # Logging.
+
             loss = {}
             loss['C/C_loss'] = cls_loss_real.item()
 
-            # print(x_real.shape)
             out_r = self.D(x_real + gaussian_noise, label_org)
-            # Compute loss with fake audio frame.
             x_fake = self.G(x_real, label_trg)
             out_f = self.D(x_fake + gaussian_noise, label_trg)
             d_loss_t = F.mse_loss(input=out_f, target=torch.zeros_like(out_f, dtype=torch.float)) + \
@@ -324,14 +306,7 @@ class StarGAN(object):
             out_cls = self.C(x_fake)
             d_loss_cls = CELoss(input=out_cls, target=style_idx_trg)
 
-            # Compute loss for gradient penalty.
-            # alpha = torch.rand(x_real.size(0), 1, 1, 1).to(self.device)
-            # x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
-            # out_src = self.D(x_hat, label_trg)
-            # d_loss_gp = self.gradient_penalty(out_src, x_hat)
-
             d_loss = d_loss_t + self.domclass_loss_weight * d_loss_cls
-            # \+ 5*d_loss_gp
 
             self.generator_optimizer.zero_grad()
             self.discriminator_optimizer.zero_grad()
@@ -340,16 +315,9 @@ class StarGAN(object):
             d_loss.backward()
             self.discriminator_optimizer.step()
 
-            # loss['D/d_loss_t'] = d_loss_t.item()
-            # loss['D/loss_cls'] = d_loss_cls.item()
-            # loss['D/D_gp'] = d_loss_gp.item()
             loss['D/D_loss'] = d_loss.item()
 
-            # =================================================================================== #
-            #                               3. Train the generator                                #
-            # =================================================================================== #
             if (i + 1) % self.discriminator_updates == 0:
-                # Original-to-target domain.
                 x_fake = self.G(x_real, label_trg)
                 g_out_src = self.D(x_fake + gaussian_noise, label_trg)
                 g_loss_fake = F.mse_loss(input=g_out_src, target=torch.ones_like(g_out_src, dtype=torch.float))
@@ -357,15 +325,12 @@ class StarGAN(object):
                 out_cls = self.C(x_real)
                 g_loss_cls = CELoss(input=out_cls, target=style_idx_org)
 
-                # Target-to-original domain.
                 x_reconst = self.G(x_fake, label_org)
                 g_loss_rec = F.l1_loss(x_reconst, x_real)
 
-                # Original-to-Original domain(identity).
                 x_fake_iden = self.G(x_real, label_org)
                 id_loss = F.l1_loss(x_fake_iden, x_real)
 
-                # Backward and optimize.
                 g_loss = g_loss_fake + self.cycle_loss_weight * g_loss_rec + \
                          self.domclass_loss_weight * g_loss_cls + self.identity_loss_weight * id_loss
 
@@ -376,16 +341,12 @@ class StarGAN(object):
                 g_loss.backward()
                 self.generator_optimizer.step()
 
-                # Logging.
                 loss['G/loss_fake'] = g_loss_fake.item()
                 loss['G/loss_rec'] = g_loss_rec.item()
                 loss['G/loss_cls'] = g_loss_cls.item()
                 loss['G/loss_id'] = id_loss.item()
                 loss['G/g_loss'] = g_loss.item()
-            # =================================================================================== #
-            #                                 4. Miscellaneous                                    #
-            # =================================================================================== #
-            # Print out training information.
+
             if (i + 1) % self.log_freq == 0:
                 et = datetime.now() - start_time
                 et = str(et)[:-7]
@@ -396,14 +357,11 @@ class StarGAN(object):
 
                 if self.use_tensorboard:
                     for tag, value in loss.items():
-                        # self.logger.scalar_summary(tag, value, i + 1)
                         summary = tf.summary.scalar(tag, value, step=i + 1)
                         self.writer.flush()
 
-            # Translate fixed images for debugging.
             if (i + 1) % self.sample_freq == 0:
                 with torch.no_grad():
-                    # d, style = TestSet(self.test_directory).test_data()
                     if self.source_style:
                         r_s = self.source_style
                     else:
@@ -452,7 +410,6 @@ class StarGAN(object):
                         one_set_cycle_binary = one_set_cycle_binary.reshape(-1, one_set_cycle_binary.shape[2],
                                                                             one_set_cycle_binary.shape[3],
                                                                             one_set_cycle_binary.shape[1])
-                        # print(one_set_transfer_binary.shape, one_set_cycle_binary.shape)
                         name_origin = f'{style}-{target}_iter{i + 1}_{filename}_origin'
                         name_transfer = f'{style}-{target}_iter{i + 1}_{filename}_transfer'
                         name_cycle = f'{style}-{target}_iter{i + 1}_{filename}_cycle'
@@ -463,8 +420,7 @@ class StarGAN(object):
                         path_transfer = os.path.join(path_samples_per_iter, name_transfer)
                         path_cycle = os.path.join(path_samples_per_iter, name_cycle)
                         print(f'[save]:{path_origin},{path_transfer},{path_cycle}')
-                        write_pianoroll_save_midis(content.reshape(1, content.shape[1], content.shape[2], content.shape[0]),
-                                   '{}.mid'.format(path_origin))
+                        write_pianoroll_save_midis(content.reshape(1, content.shape[1], content.shape[2], content.shape[0]), '{}.mid'.format(path_origin))
                         write_pianoroll_save_midis(one_set_transfer_binary, '{}.mid'.format(path_transfer))
                         write_pianoroll_save_midis(one_set_cycle_binary, '{}.mid'.format(path_cycle))
 
@@ -490,79 +446,73 @@ class StarGAN(object):
                 print('Decayed learning rates, generator_lr: {}, discriminator_lr: {}.'.format(generator_lr, discriminator_lr))
 
     def test(self):
-        print('Loading the trained models from step {}...'.format(self.test_epochs))
+        print('Loading models from ' + str(self.test_epochs) + ' epochs')
         G_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
         D_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
         C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
+
         if self.source_style:
-            r_s = self.source_style
+            source_style = self.source_style
         else:
-            r_s = random.choice(styles)
-        p = os.path.join(self.test_directory, r_s)
-        npyfiles = librosa.util.find_files(p, ext='npy')
-        res = {}
-        for f in npyfiles:
+            source_style = random.choice(styles)
+        files = os.path.join(self.test_directory, source_style)
+        files = librosa.util.find_files(files, ext='npy')
+        npy_files = {}
+        for f in files:
             filename = os.path.basename(f)
-            mid = np.load(f) * 1.
-            if not res.__contains__(filename):
-                res[filename] = {}
-            res[filename] = mid
-        d, style = res, r_s
-        targets = self.target_style
-        for target in targets:
-            assert target in styles
-            label_t = self.styles_encoder.transform([target])[0]
-            label_t = np.asarray([label_t])
+            file = np.load(f) * 1.
+            if not npy_files.__contains__(filename):
+                npy_files[filename] = {}
+            npy_files[filename] = file
+        target_styles = self.target_style
+        for style in target_styles:
+            assert style in styles
+            label_style = self.styles_encoder.transform([style])[0]
+            label_style = np.asarray([label_style])
             with torch.no_grad():
-                for filename, content in d.items():
+                for filename, npy in npy_files.items():
                     filename = filename.split('.')[0]
-                    one_seg = torch.FloatTensor(content).to(self.device)
-                    one_seg = one_seg.view(1, one_seg.size(0), one_seg.size(1), one_seg.size(2))
-                    l_t = torch.FloatTensor(label_t)
-                    one_seg = one_seg.to(self.device)
-                    l_t = l_t.to(self.device)
-                    one_set_transfer = self.G(one_seg, l_t).cpu().numpy()
-                    track_is_max = np.equal(one_set_transfer, np.amax(one_set_transfer, axis=-1, keepdims=True))
-                    track_pass_threshold = (one_set_transfer > 0.5)
-                    one_set_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
-                    one_set_transfer_binary = one_set_transfer_binary.reshape(-1, one_set_transfer_binary.shape[2],
-                                                                              one_set_transfer_binary.shape[3],
-                                                                              one_set_transfer_binary.shape[1])
-                    name_origin = f'{style}-{target}_iter200000_{filename}_origin'
-                    name_transfer = f'{style}-{target}_iter200000_{filename}_transfer'
-                    path = os.path.join(self.results_directory, f'iter200000')
+                    npy_mod = torch.FloatTensor(npy).to(self.device)
+                    npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
+                    l_style = torch.FloatTensor(label_style)
+                    npy_mod = npy_mod.to(self.device)
+                    l_style = l_style.to(self.device)
+                    npy_transfer = self.G(npy_mod, l_style).cpu().numpy()
+                    track_is_max = np.equal(npy_transfer, np.amax(npy_transfer, axis=-1, keepdims=True))
+                    track_pass_threshold = (npy_transfer > 0.5)
+                    npy_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
+                    npy_transfer_binary = npy_transfer_binary.reshape(-1, npy_transfer_binary.shape[2], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1])
+                    name_origin = f'{source_style}-{style}_iter{self.test_epochs}_{filename}_origin'
+                    name_transfer = f'{source_style}-{style}_iter{self.test_epochs}_{filename}_transfer'
+                    path = os.path.join(self.results_directory, f'iter{self.test_epochs}')
                     path_origin = os.path.join(path, name_origin)
                     path_transfer = os.path.join(path, name_transfer)
-                    print(f'[save]:{path_origin},{path_transfer}')
-                    write_pianoroll_save_midis(content.reshape(1, content.shape[1], content.shape[2], content.shape[0]),
-                               '{}.mid'.format(path_origin))
-                    write_pianoroll_save_midis(one_set_transfer_binary, '{}.mid'.format(path_transfer))
+                    print(f'saved: {name_origin}, {name_transfer}')
+                    write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), '{}.mid'.format(path_origin))
+                    write_pianoroll_save_midis(npy_transfer_binary, '{}.mid'.format(path_transfer))
 
     def classify(self):
-        print("Classify files from directory " + str(self.classify_directory))
+        print("Classify files from " + str(self.classify_directory))
         C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
         self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
-        p = os.path.join(self.classify_directory)
-        npyfiles = librosa.util.find_files(p, ext='npy')
-        res = {}
-        for f in npyfiles:
+        files = os.path.join(self.classify_directory)
+        files = librosa.util.find_files(files, ext='npy')
+        npy_files = {}
+        for f in files:
             filename = os.path.basename(f)
-            mid = np.load(f) * 1.
-            if not res.__contains__(filename):
-                res[filename] = {}
-            res[filename] = mid
+            file = np.load(f) * 1.
+            if not npy_files.__contains__(filename):
+                npy_files[filename] = {}
+            npy_files[filename] = file
         with torch.no_grad():
-            for filename, content in res.items():
-                one_seg = torch.FloatTensor(content).to(self.device)
-                one_seg = one_seg.view(1, one_seg.size(0), one_seg.size(1), one_seg.size(2))
-                test_class = self.C(one_seg)
-                test_class -= test_class.min(1, keepdim=True)[0]
-                test_class /= test_class.max(1, keepdim=True)[0]
-                test_class_style = self.styles_encoder.inverse_transform(test_class)
-                print(filename + " has style class " + test_class_style[0])
-
-
-
+            for filename, npy in npy_files.items():
+                npy_mod = torch.FloatTensor(npy).to(self.device)
+                npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
+                file_class = self.C(npy_mod)
+                file_class -= file_class.min(1, keepdim=True)[0]
+                file_class /= file_class.max(1, keepdim=True)[0]
+                file_class_style = self.styles_encoder.inverse_transform(file_class)
+                print(f'File {filename} is classified to {file_class_style[0]} style')
