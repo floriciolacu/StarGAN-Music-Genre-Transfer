@@ -243,20 +243,17 @@ if __name__ == '__main__':
 
     styles = get_styles('./data/rock_bossanova_funk_RnB')
     dataset = AudioDataset(args.dataset_directory)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    dataset_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
     if args.type == "train":
-        print("train")
-        model = StarGAN(loader, args)
+        model = StarGAN(dataset_loader, args)
         model.train()
 
     if args.type == "test":
-        print("test")
-        model = StarGAN(loader, args)
+        model = StarGAN(dataset_loader, args)
         model.test()
 
     if args.type == "classify":
-        print("classify")
-        model = StarGAN(loader, args)
+        model = StarGAN(dataset_loader, args)
         model.classify()
 
