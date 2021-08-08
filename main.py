@@ -9,78 +9,85 @@ from torch.utils.data.dataloader import DataLoader
 from StarGAN import *
 
 
-class AudioDataset(Dataset):
-    def __init__(self, datadir:str):
-        super(AudioDataset, self).__init__()
-        self.datadir = datadir
-        self.files = librosa.util.find_files(datadir, ext='npy')
-        self.encoder = LabelBinarizer().fit(styles)
+class SongsDataset(Dataset):
+    def __init__(self, dataset_directory:str):
+        super(SongsDataset, self).__init__()
+        self.dataset_directory = dataset_directory
+        self.files = librosa.util.find_files(dataset_directory, ext='npy')
+        self.style_encoder = LabelBinarizer().fit(styles)
 
     def __getitem__(self, idx):
         p = self.files[idx]
         filename = os.path.basename(p)
         style = filename.split(sep='_', maxsplit=1)[0]
-        label = self.encoder.transform([style])[0]
-        mid = np.load(p)*1.
-        mid = torch.FloatTensor(mid)
-        return mid, torch.tensor(styles.index(style), dtype=torch.long), torch.FloatTensor(label)
+        label = self.style_encoder.transform([style])[0]
+        file = np.load(p)*1.
+        file = torch.FloatTensor(file)
+        return file, torch.tensor(styles.index(style), dtype=torch.long), torch.FloatTensor(label)
 
     def __len__(self):
         return len(self.files)
 
 
-def str2bool(v):
-    return v.lower() in ('true')
+def str2bool(s):
+    return s.lower() in ('true')
 
 
 def get_styles(dataset_train: str, styles = []):
     if '_' in dataset_train:
-        dt = dataset_train.rsplit('_', maxsplit=1)
-        styles.append(dt[1])
-        get_styles(dt[0],styles)
+        dataset_train = dataset_train.rsplit('_', maxsplit=1)
+        styles.append(dataset_train[1])
+        get_styles(dataset_train[0],styles)
     else:
         styles.append(dataset_train.rsplit('/', maxsplit=1)[1])
     return list(reversed(styles))
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="")
     # parser.add_argument('-f')
 
     parser.add_argument(
         '--dataset_directory',
         type=str,
         default='data/rock_bossanova_funk_RnB',
+        help="path of the dataset directory for train",
     )
     parser.add_argument(
         '--test_directory',
         type=str,
         default='data/test',
+        help="path of the dataset directory for test",
     )
     parser.add_argument(
         '--classify_directory',
         type=str,
         default='data/test1/rock',
+        help="path of the directory of the files to classify",
     )
     parser.add_argument(
         '--logs_directory',
         type=str,
         default='stargan_songs/logs',
+        help="logs are saved here",
     )
     parser.add_argument(
         '--models_directory',
         type=str,
         default='stargan_songs/models',
+        help="models are saved here",
     )
     parser.add_argument(
         '--samples_directory',
         type=str,
         default='stargan_songs/samples',
+        help="samples are saved here",
     )
     parser.add_argument(
         '--results_directory',
         type=str,
         default='stargan_songs/results',
+        help="samples are saved here",
     )
     parser.add_argument(
         '--cycle_loss_weight',
@@ -110,19 +117,19 @@ if __name__ == '__main__':
         '--batch_size',
         type=int,
         default=8,
-        help='batch size',
+        help='# songs in batch',
     )
     parser.add_argument(
-        '--iters',
+        '--epochs',
         type=int,
         default=200000,
-        help='number of total iterations for training Discriminator',
+        help='# of epochs to train Discriminator',
     )
     parser.add_argument(
-        '--iters_decay_lr',
+        '--lr_decay_epochs',
         type=int,
         default=100000,
-        help='number of iterations for decaying lr',
+        help='# of epochs to decaying lr',
     )
     parser.add_argument(
         '--generator_lr',
@@ -161,70 +168,77 @@ if __name__ == '__main__':
         help='beta2 for Adam optimizer',
     )
     parser.add_argument(
-        '--resume_iters',
+        '--resume_epochs',
         type=int,
         default=None,
-        help='resume training from this step',
+        help='resume train from # of epochs',
     )
     parser.add_argument(
-        '--test_iters',
+        '--test_epochs',
         type=int,
         default=200000,
-        help='test model from this step',
+        help='test model from # of epochs',
     )
     parser.add_argument(
-        '--classifier_iters',
+        '--classifier_epochs',
         type=int,
         default=200000,
-        help='classifier model from this step',
+        help='classifier model from # of epochs',
     )
     parser.add_argument(
         '--source_style',
         type=str,
         default=None,
-        help='test model source style',
+        help='source style for testing',
     )
     parser.add_argument(
         '--target_style',
         type=str,
         default="['rock', 'bossanova']",
-        help='string list of target styles eg."[a,b]"',
+        help='list of target styles for testing eg."[a,b]"',
     )
     parser.add_argument(
         '--num_workers',
         type=int,
         default=4,
+        help='# of workers that will simultaneously retrieve data',
     )
     parser.add_argument(
         '--type',
         type=str,
         default='train',
         choices=['train', 'test', 'classify'],
+        help='train, test or classify',
     )
     parser.add_argument(
         '--use_tensorboard',
         type=str2bool,
         default=True,
+        help='tensorboard to be used',
     )
     parser.add_argument(
         '--log_freq',
         type=int,
         default=10,
+        help="save log every log_freq epochs"
     )
     parser.add_argument(
         '--sample_freq',
         type=int,
         default=2000,
+        help="save samples every sample_freq epochs"
     )
     parser.add_argument(
         '--model_freq',
         type=int,
         default=10000,
+        help="save model every model_freq epochs"
     )
     parser.add_argument(
         '--lr_update_freq',
         type=int,
         default=100000,
+        help="update learning rate every lr_update_freq epochs"
     )
 
     args = parser.parse_args()
@@ -242,8 +256,8 @@ if __name__ == '__main__':
         os.makedirs(args.results_directory)
 
     styles = get_styles('./data/rock_bossanova_funk_RnB')
-    dataset = AudioDataset(args.dataset_directory)
-    dataset_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    songs_dataset = SongsDataset(args.dataset_directory)
+    dataset_loader = DataLoader(songs_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
     if args.type == "train":
         model = StarGAN(dataset_loader, args)

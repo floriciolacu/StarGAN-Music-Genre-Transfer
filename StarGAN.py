@@ -201,18 +201,18 @@ class StarGAN(object):
         self.test_directory = args.test_directory
         self.classify_directory = args.classify_directory
         self.batch_size = args.batch_size
-        self.iters = args.iters
-        self.iters_decay_lr = args.iters_decay_lr
+        self.epochs = args.epochs
+        self.lr_decay_epochs = args.lr_decay_epochs
         self.generator_lr = args.generator_lr
         self.discriminator_lr = args.discriminator_lr
         self.classifier_lr = args.classifier_lr
         self.discriminator_updates = args.discriminator_updates
         self.beta1 = args.beta1
         self.beta2 = args.beta2
-        self.resume_iters = args.resume_iters
+        self.resume_epochs = args.resume_epochs
 
-        self.classifier_iters = args.classifier_iters
-        self.test_iters = args.test_iters
+        self.classifier_epochs = args.classifier_epochs
+        self.test_epochs = args.test_epochs
         self.target_style = ast.literal_eval(args.target_style)
         self.source_style = args.source_style
 
@@ -259,7 +259,7 @@ class StarGAN(object):
         classifier_lr = self.classifier_lr
 
         start_iters = 0
-        if self.resume_iters:
+        if self.resume_epochs:
             pass
 
         # norm = Normalizer()
@@ -268,7 +268,7 @@ class StarGAN(object):
         print('Start training......')
         start_time = datetime.now()
 
-        for i in range(start_iters, self.iters):
+        for i in range(start_iters, self.epochs):
             # =================================================================================== #
             #                             1. Preprocess input data                                #
             # =================================================================================== #
@@ -389,7 +389,7 @@ class StarGAN(object):
             if (i + 1) % self.log_freq == 0:
                 et = datetime.now() - start_time
                 et = str(et)[:-7]
-                log = "Elapsed [{}], Epoch [{}/{}]".format(et, i + 1, self.iters)
+                log = "Elapsed [{}], Epochs [{}/{}]".format(et, i + 1, self.epochs)
                 for tag, value in loss.items():
                     log += ", {}: {:.4f}".format(tag, value)
                 print(log)
@@ -477,10 +477,10 @@ class StarGAN(object):
                 torch.save(self.C.state_dict(), C_path)
                 print('Saved model checkpoints into {}...'.format(self.models_directory))
 
-            if (i + 1) % self.lr_update_freq == 0 and (i + 1) > (self.iters - self.iters_decay_lr):
-                generator_lr -= (self.generator_lr / float(self.iters_decay_lr))
-                discriminator_lr -= (self.discriminator_lr / float(self.iters_decay_lr))
-                classifier_lr -= (self.classifier_lr / float(self.iters_decay_lr))
+            if (i + 1) % self.lr_update_freq == 0 and (i + 1) > (self.epochs - self.lr_decay_epochs):
+                generator_lr -= (self.generator_lr / float(self.lr_decay_epochs))
+                discriminator_lr -= (self.discriminator_lr / float(self.lr_decay_epochs))
+                classifier_lr -= (self.classifier_lr / float(self.lr_decay_epochs))
                 for p in self.generator_optimizer.param_groups:
                     p['lr'] = generator_lr
                 for p in self.discriminator_optimizer.param_groups:
@@ -490,10 +490,10 @@ class StarGAN(object):
                 print('Decayed learning rates, generator_lr: {}, discriminator_lr: {}.'.format(generator_lr, discriminator_lr))
 
     def test(self):
-        print('Loading the trained models from step {}...'.format(self.test_iters))
-        G_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_iters))
-        D_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_iters))
-        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_iters))
+        print('Loading the trained models from step {}...'.format(self.test_epochs))
+        G_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
+        D_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
+        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
@@ -543,7 +543,7 @@ class StarGAN(object):
 
     def classify(self):
         print("Classify files from directory " + str(self.classify_directory))
-        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_iters))
+        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
         self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
         p = os.path.join(self.classify_directory)
         npyfiles = librosa.util.find_files(p, ext='npy')
