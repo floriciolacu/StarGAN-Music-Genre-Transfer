@@ -496,8 +496,8 @@ class StarGAN(object):
 
     def classify(self):
         print("Classify files from " + str(self.classify_directory))
-        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
-        self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
+        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
+        self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
         files = os.path.join(self.classify_directory)
         files = librosa.util.find_files(files, ext='npy')
         npy_files = {}
