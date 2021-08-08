@@ -425,13 +425,13 @@ class StarGAN(object):
                         write_pianoroll_save_midis(one_set_cycle_binary, '{}.mid'.format(path_cycle))
 
             if (i + 1) % self.model_freq == 0:
-                G_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(i + 1))
-                D_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(i + 1))
-                C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(i + 1))
-                torch.save(self.G.state_dict(), G_path)
-                torch.save(self.D.state_dict(), D_path)
-                torch.save(self.C.state_dict(), C_path)
-                print('Saved model checkpoints into {}...'.format(self.models_directory))
+                generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(i + 1))
+                discriminator_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(i + 1))
+                classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(i + 1))
+                torch.save(self.G.state_dict(), generator_path)
+                torch.save(self.D.state_dict(), discriminator_path)
+                torch.save(self.C.state_dict(), classifier_path)
+                print(f'Models saved into {self.models_directory}.')
 
             if (i + 1) % self.lr_update_freq == 0 and (i + 1) > (self.epochs - self.lr_decay_epochs):
                 generator_lr -= (self.generator_lr / float(self.lr_decay_epochs))
@@ -443,16 +443,16 @@ class StarGAN(object):
                     p['lr'] = discriminator_lr
                 for p in self.classifier_optimizer.param_groups:
                     p['lr'] = classifier_lr
-                print('Decayed learning rates, generator_lr: {}, discriminator_lr: {}.'.format(generator_lr, discriminator_lr))
+                print(f'Learning rates decayed. Generator: {generator_lr}, Discriminator: {discriminator_lr}.')
 
     def test(self):
         print('Loading models from ' + str(self.test_epochs) + ' epochs')
-        G_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
-        D_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
-        C_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
-        self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-        self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
-        self.C.load_state_dict(torch.load(C_path, map_location=lambda storage, loc: storage))
+        generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
+        discriminator_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
+        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
+        self.G.load_state_dict(torch.load(generator_path, map_location=lambda storage, loc: storage))
+        self.D.load_state_dict(torch.load(discriminator_path, map_location=lambda storage, loc: storage))
+        self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
 
         if self.source_style:
             source_style = self.source_style
