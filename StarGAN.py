@@ -510,3 +510,39 @@ class StarGAN(object):
                 file_class /= file_class.max(1, keepdim=True)[0]
                 file_class_style = self.styles_encoder.inverse_transform(file_class)
                 print(f'File {filename} is classified to {file_class_style[0]} style')
+
+    def classifier_logs(self):
+        print("Classify files from " + str(self.classify_directory))
+        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
+        self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
+        files = os.path.join(self.classify_directory)
+        files = librosa.util.find_files(files, ext='npy')
+        nr_files = len(files)
+        classfied_correctly = 0
+        npy_files = {}
+        for f in files:
+            filename = os.path.basename(f)
+            file = np.load(f) * 1.
+            if not npy_files.__contains__(filename):
+                npy_files[filename] = {}
+            npy_files[filename] = file
+        with torch.no_grad():
+            for filename, npy in npy_files.items():
+                npy_mod = torch.FloatTensor(npy).to(self.device)
+                npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
+                gaussian_noise = self.sigma_d * torch.randn(npy_mod.size())
+                gaussian_noise = gaussian_noise.to(self.device)
+                file_class = self.C(npy_mod + gaussian_noise)
+                file_class -= file_class.min(1, keepdim=True)[0]
+                file_class /= file_class.max(1, keepdim=True)[0]
+                file_class_style = self.styles_encoder.inverse_transform(file_class)
+                filename_split = filename.split("_")
+                if file_class_style[0] == filename_split[0]:
+                    classfied_correctly += 1
+                if file_class_style[0] == "RnB" and filename_split[0] == "rock":
+                    classfied_correctly += 1
+                if file_class_style[0] == "rock" and filename_split[0] == "RnB":
+                    classfied_correctly += 1
+        # print(classfied_correctly)
+        percentage = classfied_correctly*100/nr_files
+        print(f'Percentage of the files classified correctly: {percentage} %')

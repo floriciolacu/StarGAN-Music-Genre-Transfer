@@ -269,4 +269,5 @@ if __name__ == '__main__':
     if args.type == "classify":
         model = StarGAN(dataset_loader, args)
         model.classify()
+        # model.classifier_logs()
 
