@@ -264,49 +264,51 @@ class StarGAN(object):
 
         for i in range(start_epochs, self.epochs):
             try:
-                x_real, style_idx_org, label_org = next(data)
+                x_real, style_idx_source, label_source = next(data)
             except:
                 data = iter(self.dataset_loader)
-                x_real, style_idx_org, label_org = next(data)
+                x_real, style_idx_source, label_source = next(data)
 
             # generate gaussian noise for robustness improvement
             gaussian_noise = self.sigma_d * torch.randn(x_real.size())
 
-            rand_idx = torch.randperm(label_org.size(0))
-            label_trg = label_org[rand_idx]
-            style_idx_trg = style_idx_org[rand_idx]
+            rand_idx = torch.randperm(label_source.size(0))
+            label_target = label_source[rand_idx]
+            style_idx_target = style_idx_source[rand_idx]
 
             x_real = x_real.to(self.device)  # Input images.
-            label_org = label_org.to(self.device)  # Original domain one-hot labels.
-            label_trg = label_trg.to(self.device)  # Target domain one-hot labels.
-            style_idx_org = style_idx_org.to(self.device)  # Original domain labels
-            style_idx_trg = style_idx_trg.to(self.device)  # Target domain labels
+            label_source = label_source.to(self.device)  # Original domain one-hot labels.
+            label_source = label_source.to(self.device)  # Target domain one-hot labels.
+            style_idx_source = style_idx_source.to(self.device)  # Original domain labels
+            style_idx_target = style_idx_target.to(self.device)  # Target domain labels
             gaussian_noise = gaussian_noise.to(self.device)  # gaussian noise for discriminators
 
-            CELoss = nn.CrossEntropyLoss()
-            cls_real = self.C(x_real)
-            cls_loss_real = CELoss(input=cls_real, target=style_idx_org)
+            cross_entropy_loss = nn.CrossEntropyLoss()
+            c_real = self.C(x_real)
+            c_loss_real = cross_entropy_loss(input=c_real, target=style_idx_source)
 
             self.generator_optimizer.zero_grad()
             self.discriminator_optimizer.zero_grad()
             self.classifier_optimizer.zero_grad()
 
-            cls_loss_real.backward()
+            c_loss_real.backward()
             self.classifier_optimizer.step()
 
             loss = {}
-            loss['C/C_loss'] = cls_loss_real.item()
+            loss_to_print = {}
 
-            out_r = self.D(x_real + gaussian_noise, label_org)
-            x_fake = self.G(x_real, label_trg)
-            out_f = self.D(x_fake + gaussian_noise, label_trg)
-            d_loss_t = F.mse_loss(input=out_f, target=torch.zeros_like(out_f, dtype=torch.float)) + \
-                       F.mse_loss(input=out_r, target=torch.ones_like(out_r, dtype=torch.float))
+            loss['C_loss'] = c_loss_real.item()
+            loss_to_print['Classifier loss'] = c_loss_real.item()
 
-            out_cls = self.C(x_fake)
-            d_loss_cls = CELoss(input=out_cls, target=style_idx_trg)
+            out_real = self.D(x_real + gaussian_noise, label_source)
+            x_fake = self.G(x_real, label_target)
+            out_fake = self.D(x_fake + gaussian_noise, label_target)
+            d_loss_t = F.mse_loss(input=out_fake, target=torch.zeros_like(out_fake, dtype=torch.float)) + F.mse_loss(input=out_real, target=torch.ones_like(out_real, dtype=torch.float))
 
-            d_loss = d_loss_t + self.domclass_loss_weight * d_loss_cls
+            out_class = self.C(x_fake)
+            d_loss_class = cross_entropy_loss(input=out_class, target=style_idx_target)
+
+            d_loss = d_loss_t + self.domclass_loss_weight * d_loss_class
 
             self.generator_optimizer.zero_grad()
             self.discriminator_optimizer.zero_grad()
@@ -315,24 +317,24 @@ class StarGAN(object):
             d_loss.backward()
             self.discriminator_optimizer.step()
 
-            loss['D/D_loss'] = d_loss.item()
+            loss['D_loss'] = d_loss.item()
+            loss_to_print['Discriminator loss'] = d_loss.item()
 
             if (i + 1) % self.discriminator_updates == 0:
-                x_fake = self.G(x_real, label_trg)
-                g_out_src = self.D(x_fake + gaussian_noise, label_trg)
-                g_loss_fake = F.mse_loss(input=g_out_src, target=torch.ones_like(g_out_src, dtype=torch.float))
+                x_fake = self.G(x_real, label_target)
+                g_out_source = self.D(x_fake + gaussian_noise, label_target)
+                g_loss_fake = F.mse_loss(input=g_out_source, target=torch.ones_like(g_out_source, dtype=torch.float))
 
-                out_cls = self.C(x_real)
-                g_loss_cls = CELoss(input=out_cls, target=style_idx_org)
+                out_class = self.C(x_real)
+                g_loss_class = cross_entropy_loss(input=out_class, target=style_idx_source)
 
-                x_reconst = self.G(x_fake, label_org)
-                g_loss_rec = F.l1_loss(x_reconst, x_real)
+                x_reconstituted = self.G(x_fake, label_source)
+                g_loss_reconstituted = F.l1_loss(x_reconstituted, x_real)
 
-                x_fake_iden = self.G(x_real, label_org)
-                id_loss = F.l1_loss(x_fake_iden, x_real)
+                x_fake_identity = self.G(x_real, label_source)
+                g_loss_fake_id = F.l1_loss(x_fake_identity, x_real)
 
-                g_loss = g_loss_fake + self.cycle_loss_weight * g_loss_rec + \
-                         self.domclass_loss_weight * g_loss_cls + self.identity_loss_weight * id_loss
+                g_loss = g_loss_fake + self.cycle_loss_weight * g_loss_reconstituted + self.domclass_loss_weight * g_loss_class + self.identity_loss_weight * g_loss_fake_id
 
                 self.generator_optimizer.zero_grad()
                 self.discriminator_optimizer.zero_grad()
@@ -341,18 +343,20 @@ class StarGAN(object):
                 g_loss.backward()
                 self.generator_optimizer.step()
 
-                loss['G/loss_fake'] = g_loss_fake.item()
-                loss['G/loss_rec'] = g_loss_rec.item()
-                loss['G/loss_cls'] = g_loss_cls.item()
-                loss['G/loss_id'] = id_loss.item()
-                loss['G/g_loss'] = g_loss.item()
+                loss['G_loss_fake'] = g_loss_fake.item()
+                loss['G_loss_reconstituted'] = g_loss_reconstituted.item()
+                loss['G_loss_class'] = g_loss_class.item()
+                loss['G_loss_fake_id'] = g_loss_fake_id.item()
+                loss['G_loss'] = g_loss.item()
+
+                loss_to_print['Generator loss'] = g_loss.item()
 
             if (i + 1) % self.log_freq == 0:
-                et = datetime.now() - start_time
-                et = str(et)[:-7]
-                log = "Elapsed [{}], Epochs [{}/{}]".format(et, i + 1, self.epochs)
-                for tag, value in loss.items():
-                    log += ", {}: {:.4f}".format(tag, value)
+                estimated_time = datetime.now() - start_time
+                estimated_time = str(estimated_time)[:-7]
+                log = f'Elapsed [{estimated_time}] Epochs [{i+1}/{self.epochs}]'
+                for tag, value in loss_to_print.items():
+                    log += f', {tag}: {value:.4f}'
                 print(log)
 
                 if self.use_tensorboard:
@@ -363,66 +367,56 @@ class StarGAN(object):
             if (i + 1) % self.sample_freq == 0:
                 with torch.no_grad():
                     if self.source_style:
-                        r_s = self.source_style
+                        source_style = self.source_style
                     else:
-                        r_s = random.choice(styles)
-                    p = os.path.join(self.test_directory, r_s)
-                    npyfiles = librosa.util.find_files(p, ext='npy')
-                    res = {}
-                    for f in npyfiles:
+                        source_style = random.choice(styles)
+                    files = os.path.join(self.test_directory, source_style)
+                    files = librosa.util.find_files(files, ext='npy')
+                    npy_files = {}
+                    for f in files:
                         filename = os.path.basename(f)
-                        print(filename)
-                        mid = np.load(f) * 1.
-                        if not res.__contains__(filename):
-                            res[filename] = {}
-                        res[filename] = mid
-                    d, style = res, r_s
-                    label_o = self.styles_encoder.transform([style])[0]
-                    label_o = np.asarray([label_o])
-                    target = random.choice([x for x in styles if x != style])
-                    label_t = self.styles_encoder.transform([target])[0]
-                    label_t = np.asarray([label_t])
-                    for filename, content in d.items():
+                        file = np.load(f) * 1.
+                        if not npy_files.__contains__(filename):
+                            npy_files[filename] = {}
+                        npy_files[filename] = file
+                    label_source_style = self.styles_encoder.transform([source_style])[0]
+                    label_source_style = np.asarray([label_source_style])
+                    target_style = random.choice([x for x in styles if x != source_style])
+                    label_target_style = self.styles_encoder.transform([target_style])[0]
+                    label_target_style = np.asarray([label_target_style])
+                    for filename, npy in npy_files.items():
                         filename = filename.split('.')[0]
-                        one_seg = torch.FloatTensor(content).to(self.device)
-                        one_seg = one_seg.view(1, one_seg.size(0), one_seg.size(1), one_seg.size(2))
-                        l_t = torch.FloatTensor(label_t)
-                        one_seg = one_seg.to(self.device)
-                        l_t = l_t.to(self.device)
-                        one_set_transfer = self.G(one_seg, l_t)
-                        l_o = torch.FloatTensor(label_o)
-                        l_o = l_o.to(self.device)
-                        one_set_cycle = self.G(one_set_transfer.to(self.device), l_o).data.cpu().numpy()
-                        one_set_transfer = one_set_transfer.data.cpu().numpy()
-                        # one_set_transfer_binary = to_binary(one_set_transfer, 0.5)
-                        # one_set_cycle_binary = to_binary(one_set_cycle, 0.5)
-                        track_is_max = np.equal(one_set_transfer, np.amax(one_set_transfer, axis=-1, keepdims=True))
-                        track_pass_threshold = (one_set_transfer > 0.5)
-                        one_set_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
-
-                        track_is_max_cycle = np.equal(one_set_cycle, np.amax(one_set_cycle, axis=-1, keepdims=True))
-                        track_pass_threshold_cycle = (one_set_cycle > 0.5)
-                        one_set_cycle_binary = np.logical_and(track_is_max_cycle, track_pass_threshold_cycle)
-
-                        one_set_transfer_binary = one_set_transfer_binary.reshape(-1, one_set_transfer_binary.shape[2],
-                                                                                  one_set_transfer_binary.shape[3],
-                                                                                  one_set_transfer_binary.shape[1])
-                        one_set_cycle_binary = one_set_cycle_binary.reshape(-1, one_set_cycle_binary.shape[2],
-                                                                            one_set_cycle_binary.shape[3],
-                                                                            one_set_cycle_binary.shape[1])
-                        name_origin = f'{style}-{target}_iter{i + 1}_{filename}_origin'
-                        name_transfer = f'{style}-{target}_iter{i + 1}_{filename}_transfer'
-                        name_cycle = f'{style}-{target}_iter{i + 1}_{filename}_cycle'
-                        path_samples_per_iter = os.path.join(self.samples_directory, f'iter{i + 1}')
-                        if not os.path.exists(path_samples_per_iter):
-                            os.makedirs(path_samples_per_iter)
-                        path_origin = os.path.join(path_samples_per_iter, name_origin)
-                        path_transfer = os.path.join(path_samples_per_iter, name_transfer)
-                        path_cycle = os.path.join(path_samples_per_iter, name_cycle)
+                        npy_mod = torch.FloatTensor(npy).to(self.device)
+                        npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
+                        label_target = torch.FloatTensor(label_target_style)
+                        npy_mod = npy_mod.to(self.device)
+                        label_target = label_target.to(self.device)
+                        npy_transfer = self.G(npy_mod, label_target)
+                        label_source = torch.FloatTensor(label_source_style)
+                        label_source = label_source.to(self.device)
+                        npy_cycle = self.G(npy_transfer.to(self.device), label_source).data.cpu().numpy()
+                        npy_transfer = npy_transfer.data.cpu().numpy()
+                        track_is_max = np.equal(npy_transfer, np.amax(npy_transfer, axis=-1, keepdims=True))
+                        track_pass_threshold = (npy_transfer > 0.5)
+                        npy_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
+                        track_is_max_cycle = np.equal(npy_cycle, np.amax(npy_cycle, axis=-1, keepdims=True))
+                        track_pass_threshold_cycle = (npy_cycle > 0.5)
+                        npy_cycle_binary = np.logical_and(track_is_max_cycle, track_pass_threshold_cycle)
+                        npy_transfer_binary = npy_transfer_binary.reshape(-1, npy_transfer_binary.shape[2], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1])
+                        npy_cycle_binary = npy_cycle_binary.reshape(-1, npy_cycle_binary.shape[2], npy_cycle_binary.shape[3], npy_cycle_binary.shape[1])
+                        name_origin = f'{source_style}-{target_style}_iter{i + 1}_{filename}_origin'
+                        name_transfer = f'{source_style}-{target_style}_iter{i + 1}_{filename}_transfer'
+                        name_cycle = f'{source_style}-{target_style}_iter{i + 1}_{filename}_cycle'
+                        path_samples_epochs= os.path.join(self.samples_directory, f'iter{i + 1}')
+                        if not os.path.exists(path_samples_epochs):
+                            os.makedirs(path_samples_epochs)
+                        path_origin = os.path.join(path_samples_epochs, name_origin)
+                        path_transfer = os.path.join(path_samples_epochs, name_transfer)
+                        path_cycle = os.path.join(path_samples_epochs, name_cycle)
                         print(f'[save]:{path_origin},{path_transfer},{path_cycle}')
-                        write_pianoroll_save_midis(content.reshape(1, content.shape[1], content.shape[2], content.shape[0]), '{}.mid'.format(path_origin))
-                        write_pianoroll_save_midis(one_set_transfer_binary, '{}.mid'.format(path_transfer))
-                        write_pianoroll_save_midis(one_set_cycle_binary, '{}.mid'.format(path_cycle))
+                        write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), '{}.mid'.format(path_origin))
+                        write_pianoroll_save_midis(npy_transfer_binary, '{}.mid'.format(path_transfer))
+                        write_pianoroll_save_midis(npy_cycle_binary, '{}.mid'.format(path_cycle))
 
             if (i + 1) % self.model_freq == 0:
                 generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(i + 1))
@@ -446,7 +440,7 @@ class StarGAN(object):
                 print(f'Learning rates decayed. Generator: {generator_lr}, Discriminator: {discriminator_lr}.')
 
     def test(self):
-        print('Loading models from ' + str(self.test_epochs) + ' epochs')
+        print(f'Loading models from {self.test_epochs} epochs')
         generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
         discriminator_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
         classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
