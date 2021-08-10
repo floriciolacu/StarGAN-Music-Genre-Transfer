@@ -237,6 +237,14 @@ class StarGAN(object):
         self.discriminator_optimizer = torch.optim.Adam(self.D.parameters(), self.discriminator_lr, [self.beta1, self.beta2])
         self.classifier_optimizer = torch.optim.Adam(self.C.parameters(), self.classifier_lr, [self.beta1, self.beta2])
 
+        # self.generator_optimizer = torch.optim.RMSprop(self.G.parameters(), self.generator_lr)
+        # self.discriminator_optimizer = torch.optim.RMSprop(self.D.parameters(), self.discriminator_lr)
+        # self.classifier_optimizer = torch.optim.RMSprop(self.C.parameters(), self.classifier_lr)
+
+        # self.generator_optimizer = torch.optim.SGD(self.G.parameters(), self.generator_lr)
+        # self.discriminator_optimizer = torch.optim.SGD(self.D.parameters(), self.discriminator_lr)
+        # self.classifier_optimizer = torch.optim.SGD(self.C.parameters(), self.classifier_lr)
+
         # print(self.G)
         # print(self.D)
         # print(self.C)
