@@ -277,19 +277,18 @@ class StarGAN(object):
                 data = iter(self.dataset_loader)
                 x_real, style_idx_source, label_source = next(data)
 
-            # generate gaussian noise for robustness improvement
             gaussian_noise = self.sigma_d * torch.randn(x_real.size())
 
             rand_idx = torch.randperm(label_source.size(0))
             label_target = label_source[rand_idx]
             style_idx_target = style_idx_source[rand_idx]
 
-            x_real = x_real.to(self.device)  # Input images.
-            label_source = label_source.to(self.device)  # Original domain one-hot labels.
-            label_source = label_source.to(self.device)  # Target domain one-hot labels.
-            style_idx_source = style_idx_source.to(self.device)  # Original domain labels
-            style_idx_target = style_idx_target.to(self.device)  # Target domain labels
-            gaussian_noise = gaussian_noise.to(self.device)  # gaussian noise for discriminators
+            x_real = x_real.to(self.device)
+            label_source = label_source.to(self.device)
+            label_source = label_source.to(self.device)
+            style_idx_source = style_idx_source.to(self.device)
+            style_idx_target = style_idx_target.to(self.device)
+            gaussian_noise = gaussian_noise.to(self.device)
 
             cross_entropy_loss = nn.CrossEntropyLoss()
             c_real = self.C(x_real)
