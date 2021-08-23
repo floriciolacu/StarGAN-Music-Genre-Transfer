@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, MultiLabelBinarizer
 from model import Generator, Discriminator, Classifier
 
 
@@ -24,7 +24,7 @@ def get_styles(dataset_train: str, styles = []):
     return list(reversed(styles))
 
 
-styles = get_styles('./data/rock_bossanova_funk_RnB')
+styles = get_styles('./data/RnB_bossanova_funk_rock')
 
 
 def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
@@ -262,8 +262,6 @@ class StarGAN(object):
         classifier_lr = self.classifier_lr
 
         start_epochs = 0
-        if self.resume_epochs:
-            pass
 
         data = iter(self.dataset_loader)
 
@@ -285,7 +283,7 @@ class StarGAN(object):
 
             x_real = x_real.to(self.device)
             label_source = label_source.to(self.device)
-            label_source = label_source.to(self.device)
+            label_target = label_target.to(self.device)
             style_idx_source = style_idx_source.to(self.device)
             style_idx_target = style_idx_target.to(self.device)
             gaussian_noise = gaussian_noise.to(self.device)
@@ -421,14 +419,17 @@ class StarGAN(object):
                         path_transfer = os.path.join(path_samples_epochs, name_transfer)
                         path_cycle = os.path.join(path_samples_epochs, name_cycle)
                         print(f'[save]:{path_origin},{path_transfer},{path_cycle}')
-                        write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), '{}.mid'.format(path_origin))
-                        write_pianoroll_save_midis(npy_transfer_binary, '{}.mid'.format(path_transfer))
-                        write_pianoroll_save_midis(npy_cycle_binary, '{}.mid'.format(path_cycle))
+                        write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), f'{path_origin}.mid')
+                        np.save(path_origin, npy.reshape(1, npy.shape[0], npy.shape[1], npy.shape[2]))
+                        write_pianoroll_save_midis(npy_transfer_binary, f'{path_transfer}.mid')
+                        np.save(path_transfer, npy_transfer_binary.reshape(npy_transfer_binary.shape[0], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1], npy_transfer_binary.shape[2]))
+                        write_pianoroll_save_midis(npy_cycle_binary, f'{path_cycle}.mid')
+                        np.save(path_cycle, npy_cycle_binary.reshape(npy_cycle_binary.shape[0], npy_cycle_binary.shape[3], npy_cycle_binary.shape[1], npy_cycle_binary.shape[2]))
 
             if (i + 1) % self.model_freq == 0:
-                generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(i + 1))
-                discriminator_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(i + 1))
-                classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(i + 1))
+                generator_path = os.path.join(self.models_directory, f'{i + 1}-G.ckpt')
+                discriminator_path = os.path.join(self.models_directory, f'{i + 1}-D.ckpt')
+                classifier_path = os.path.join(self.models_directory, f'{i + 1}-C.ckpt')
                 torch.save(self.G.state_dict(), generator_path)
                 torch.save(self.D.state_dict(), discriminator_path)
                 torch.save(self.C.state_dict(), classifier_path)
@@ -448,9 +449,9 @@ class StarGAN(object):
 
     def test(self):
         print(f'Loading models from {self.test_epochs} epochs')
-        generator_path = os.path.join(self.models_directory, '{}-G.ckpt'.format(self.test_epochs))
-        discriminator_path = os.path.join(self.models_directory, '{}-D.ckpt'.format(self.test_epochs))
-        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.test_epochs))
+        generator_path = os.path.join(self.models_directory, f'{self.test_epochs}-G.ckpt')
+        discriminator_path = os.path.join(self.models_directory, f'{self.test_epochs}-D.ckpt')
+        classifier_path = os.path.join(self.models_directory, f'{self.test_epochs}-C.ckpt')
         self.G.load_state_dict(torch.load(generator_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(discriminator_path, map_location=lambda storage, loc: storage))
         self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
@@ -492,12 +493,14 @@ class StarGAN(object):
                     path_origin = os.path.join(path, name_origin)
                     path_transfer = os.path.join(path, name_transfer)
                     print(f'saved: {name_origin}, {name_transfer}')
-                    write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), '{}.mid'.format(path_origin))
-                    write_pianoroll_save_midis(npy_transfer_binary, '{}.mid'.format(path_transfer))
+                    write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), f'{path_origin}.mid')
+                    np.save(path_origin, npy.reshape(1, npy.shape[0], npy.shape[1], npy.shape[2]))
+                    write_pianoroll_save_midis(npy_transfer_binary, f'{path_transfer}.mid')
+                    np.save(path_transfer, npy_transfer_binary.reshape(npy_transfer_binary.shape[0], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1], npy_transfer_binary.shape[2]))
 
     def classify(self):
         print("Classify files from " + str(self.classify_directory))
-        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
+        classifier_path = os.path.join(self.models_directory, f'{self.classifier_epochs}-C.ckpt')
         self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
         files = os.path.join(self.classify_directory)
         files = librosa.util.find_files(files, ext='npy')
@@ -511,16 +514,25 @@ class StarGAN(object):
         with torch.no_grad():
             for filename, npy in npy_files.items():
                 npy_mod = torch.FloatTensor(npy).to(self.device)
-                npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
-                file_class = self.C(npy_mod)
-                file_class -= file_class.min(1, keepdim=True)[0]
-                file_class /= file_class.max(1, keepdim=True)[0]
-                file_class_style = self.styles_encoder.inverse_transform(file_class)
-                print(f'File {filename} is classified to {file_class_style[0]} style')
+                try:
+                    file_class = self.C(npy_mod)
+                    file_class -= file_class.min(1, keepdim=True)[0]
+                    file_class /= file_class.max(1, keepdim=True)[0]
+                    file_class_style = self.styles_encoder.inverse_transform(file_class.cpu().numpy())
+                    print(file_class_style)
+                    print(f'File {filename} is classified to {file_class_style[0]} style')
+                except:
+                    npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
+                    file_class = self.C(npy_mod)
+                    file_class -= file_class.min(1, keepdim=True)[0]
+                    file_class /= file_class.max(1, keepdim=True)[0]
+                    file_class_style = self.styles_encoder.inverse_transform(file_class.cpu().numpy())
+                    print(f'File {filename} is classified to {file_class_style[0]} style')
+
 
     def classifier_logs(self):
         print("Classify files from " + str(self.classify_directory))
-        classifier_path = os.path.join(self.models_directory, '{}-C.ckpt'.format(self.classifier_epochs))
+        classifier_path = os.path.join(self.models_directory, f'{self.classifier_epochs}-C.ckpt')
         self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
         files = os.path.join(self.classify_directory)
         files = librosa.util.find_files(files, ext='npy')

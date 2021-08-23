@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--test_directory',
         type=str,
-        default='data/test',
+        default='data/test1',
         help="path of the dataset directory for test",
     )
     parser.add_argument(
@@ -254,7 +254,7 @@ if __name__ == '__main__':
     if not os.path.exists(args.results_directory):
         os.makedirs(args.results_directory)
 
-    styles = get_styles('./data/rock_bossanova_funk_RnB')
+    styles = get_styles('./data/RnB_bossanova_funk_rock')
     songs_dataset = SongsDataset(args.dataset_directory)
     dataset_loader = DataLoader(songs_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
