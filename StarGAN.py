@@ -28,6 +28,7 @@ styles = get_styles('./data/RnB_bossanova_funk_rock')
 
 
 def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
+    # Get all the input instruments
     padded_bars = np.concatenate((np.zeros((bars.shape[0], bars.shape[1], 24, bars.shape[3])), bars,
                                   np.zeros((bars.shape[0], bars.shape[1], 20, bars.shape[3]))), axis=2)
     pause = np.zeros((bars.shape[0], 64, 128, bars.shape[3]))
@@ -40,19 +41,27 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                                                                                  images_with_pause.shape[2]))
     program_nums = ["Electric Guitar (clean)", "Acoustic Bass", "Drums"]
     is_drum = [False, False, True]
+    # Create PrettyMIDI object
     midi = pretty_midi.PrettyMIDI(initial_tempo=tempo)
+    # Iterate through all the input instruments
     for idx in range(len(images_with_pause_list)):
         if idx == 0:
+            # Create an Instrument object
             instrument_program = pretty_midi.instrument_name_to_program('Electric Guitar (clean)')
             instrument = pretty_midi.Instrument(program=instrument_program, is_drum=is_drum[idx])
+            ## Set the piano roll to the Instrument object
+            # Calculate time per pixel
             piano_roll = images_with_pause_list[idx]
             tpp = 60.0 / tempo / float(4)
             threshold = 60.0 / tempo / 4
             phrase_end_time = 60.0 / tempo * 4 * piano_roll.shape[0]
+            # Create piano_roll_search that captures note onsets and offsets
             piano_roll = piano_roll.reshape((piano_roll.shape[0] * piano_roll.shape[1], piano_roll.shape[2]))
             piano_roll_diff = np.concatenate((np.zeros((1, 128), dtype=int), piano_roll, np.zeros((1, 128), dtype=int)))
             piano_roll_search = np.diff(piano_roll_diff.astype(int), axis=0)
+            # Iterate through all possible(128) pitches
             for note_num in range(128):
+                # Search for notes
                 start_idx = (piano_roll_search[:, note_num] > 0).nonzero()
                 start_time = list(tpp * (start_idx[0].astype(float)))
                 end_idx = (piano_roll_search[:, note_num] < 0).nonzero()
@@ -76,9 +85,12 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                 if len(end_time) < len(start_time):
                     d = len(start_time) - len(end_time)
                     start_time = start_time[:-d]
+                # Iterate through all the found notes
                 for idx in range(len(start_time)):
                     if duration[idx] >= threshold:
+                        # Create an Note object with corresponding note number, start time and end time
                         note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx], end=end_time[idx])
+                        # Add the note to the Instrument object
                         instrument.notes.append(note)
                     else:
                         if start_time[idx] + threshold <= phrase_end_time:
@@ -86,19 +98,27 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                         else:
                             note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx], end=phrase_end_time)
                         instrument.notes.append(note)
+            # Sort the notes by their start time
             instrument.notes.sort(key=lambda note: note.start)
+            # Add the instrument to the PrettyMIDI object
             midi.instruments.append(instrument)
         if idx == 1:
+            # Create an Instrument object
             instrument_program = pretty_midi.instrument_name_to_program('Acoustic Bass')
             instrument = pretty_midi.Instrument(program=instrument_program, is_drum=is_drum[idx])
+            ## Set the piano roll to the Instrument object
+            # Calculate time per pixel
             piano_roll = images_with_pause_list[idx]
             tpp = 60.0 / tempo / float(4)
             threshold = 60.0 / tempo / 4
             phrase_end_time = 60.0 / tempo * 4 * piano_roll.shape[0]
+            # Create piano_roll_search that captures note onsets and offsets
             piano_roll = piano_roll.reshape((piano_roll.shape[0] * piano_roll.shape[1], piano_roll.shape[2]))
             piano_roll_diff = np.concatenate((np.zeros((1, 128), dtype=int), piano_roll, np.zeros((1, 128), dtype=int)))
             piano_roll_search = np.diff(piano_roll_diff.astype(int), axis=0)
+            # Iterate through all possible(128) pitches
             for note_num in range(128):
+                # Search for notes
                 start_idx = (piano_roll_search[:, note_num] > 0).nonzero()
                 start_time = list(tpp * (start_idx[0].astype(float)))
                 end_idx = (piano_roll_search[:, note_num] < 0).nonzero()
@@ -122,9 +142,12 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                 if len(end_time) < len(start_time):
                     d = len(start_time) - len(end_time)
                     start_time = start_time[:-d]
+                # Iterate through all the found notes
                 for idx in range(len(start_time)):
                     if duration[idx] >= threshold:
+                        # Create an Note object with corresponding note number, start time and end time
                         note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx], end=end_time[idx])
+                        # Add the note to the Instrument object
                         instrument.notes.append(note)
                     else:
                         if start_time[idx] + threshold <= phrase_end_time:
@@ -134,18 +157,26 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                             note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx],
                                                     end=phrase_end_time)
                         instrument.notes.append(note)
+            # Sort the notes by their start time
             instrument.notes.sort(key=lambda note: note.start)
+            # Add the instrument to the PrettyMIDI object
             midi.instruments.append(instrument)
         if idx == 2:
+            # Create an Instrument object
             instrument = pretty_midi.Instrument(program=0, is_drum=is_drum[idx])
+            ## Set the piano roll to the Instrument object
+            # Calculate time per pix
             piano_roll = images_with_pause_list[idx]
             tpp = 60.0 / tempo / float(4)
             threshold = 60.0 / tempo / 4
             phrase_end_time = 60.0 / tempo * 4 * piano_roll.shape[0]
+            # Create piano_roll_search that captures note onsets and offsets
             piano_roll = piano_roll.reshape((piano_roll.shape[0] * piano_roll.shape[1], piano_roll.shape[2]))
             piano_roll_diff = np.concatenate((np.zeros((1, 128), dtype=int), piano_roll, np.zeros((1, 128), dtype=int)))
             piano_roll_search = np.diff(piano_roll_diff.astype(int), axis=0)
+            # Iterate through all possible(128) pitches
             for note_num in range(128):
+                # Search for notes
                 start_idx = (piano_roll_search[:, note_num] > 0).nonzero()
                 start_time = list(tpp * (start_idx[0].astype(float)))
                 end_idx = (piano_roll_search[:, note_num] < 0).nonzero()
@@ -169,9 +200,12 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                 if len(end_time) < len(start_time):
                     d = len(start_time) - len(end_time)
                     start_time = start_time[:-d]
+                # Iterate through all the found notes
                 for idx in range(len(start_time)):
                     if duration[idx] >= threshold:
+                        # Create an Note object with corresponding note number, start time and end time
                         note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx], end=end_time[idx])
+                        # Add the note to the Instrument object
                         instrument.notes.append(note)
                     else:
                         if start_time[idx] + threshold <= phrase_end_time:
@@ -181,8 +215,11 @@ def write_pianoroll_save_midis(bars, file_path, tempo=80.0):
                             note = pretty_midi.Note(velocity=100, pitch=note_num, start=start_time[idx],
                                                     end=phrase_end_time)
                         instrument.notes.append(note)
+            # Sort the notes by their start time
             instrument.notes.sort(key=lambda note: note.start)
+            # Add the instrument to the PrettyMIDI object
             midi.instruments.append(instrument)
+    # Write the MIDI data into the file
     midi.write(file_path)
 
 
@@ -224,7 +261,7 @@ class StarGAN(object):
         self.models_directory = args.models_directory
         self.results_directory = args.results_directory
 
-        self.log_freq = args.log_freq
+        self.print_freq = args.print_freq
         self.sample_freq = args.sample_freq
         self.model_freq = args.model_freq
         self.lr_update_freq = args.lr_update_freq
@@ -257,6 +294,7 @@ class StarGAN(object):
             self.writer = tf.summary.create_file_writer(self.logs_directory)
 
     def train(self):
+        # Learning rate cache for decaying
         generator_lr = self.generator_lr
         discriminator_lr = self.discriminator_lr
         classifier_lr = self.classifier_lr
@@ -269,25 +307,35 @@ class StarGAN(object):
         start_time = datetime.now()
 
         for i in range(start_epochs, self.epochs):
+            # Fetch real data and their labels
             try:
                 x_real, style_idx_source, label_source = next(data)
             except:
                 data = iter(self.dataset_loader)
                 x_real, style_idx_source, label_source = next(data)
 
+            # Generate gaussian noise for robustness improvement
             gaussian_noise = self.sigma_d * torch.randn(x_real.size())
 
+            # Generate target domain labels randomly
             rand_idx = torch.randperm(label_source.size(0))
             label_target = label_source[rand_idx]
             style_idx_target = style_idx_source[rand_idx]
 
+            # Input data
             x_real = x_real.to(self.device)
+            # Original domain encoded
             label_source = label_source.to(self.device)
+            # Target domain encoded
             label_target = label_target.to(self.device)
+            # Original domain labels
             style_idx_source = style_idx_source.to(self.device)
+            # Target domain labels
             style_idx_target = style_idx_target.to(self.device)
+            # Gaussian noise for Discriminator network
             gaussian_noise = gaussian_noise.to(self.device)
 
+            # Compute loss with real audio frame
             cross_entropy_loss = nn.CrossEntropyLoss()
             c_real = self.C(x_real)
             c_loss_real = cross_entropy_loss(input=c_real, target=style_idx_source)
@@ -302,10 +350,12 @@ class StarGAN(object):
             loss = {}
             loss_to_print = {}
 
+            # Logging loss for Classifier network
             loss['C_loss'] = c_loss_real.item()
             loss_to_print['Classifier loss'] = c_loss_real.item()
 
             out_real = self.D(x_real + gaussian_noise, label_source)
+            # Compute loss with fake audio frame.
             x_fake = self.G(x_real, label_target)
             out_fake = self.D(x_fake + gaussian_noise, label_target)
             d_loss_t = F.mse_loss(input=out_fake, target=torch.zeros_like(out_fake, dtype=torch.float)) + F.mse_loss(input=out_real, target=torch.ones_like(out_real, dtype=torch.float))
@@ -315,6 +365,7 @@ class StarGAN(object):
 
             d_loss = d_loss_t + self.domclass_loss_weight * d_loss_class
 
+            # Reset gradients
             self.generator_optimizer.zero_grad()
             self.discriminator_optimizer.zero_grad()
             self.classifier_optimizer.zero_grad()
@@ -322,10 +373,13 @@ class StarGAN(object):
             d_loss.backward()
             self.discriminator_optimizer.step()
 
+            # Logging loss for Discriminator network
             loss['D_loss'] = d_loss.item()
             loss_to_print['Discriminator loss'] = d_loss.item()
 
+            ### Train Generator network
             if (i + 1) % self.discriminator_updates == 0:
+                # Original to target domain transfer
                 x_fake = self.G(x_real, label_target)
                 g_out_source = self.D(x_fake + gaussian_noise, label_target)
                 g_loss_fake = F.mse_loss(input=g_out_source, target=torch.ones_like(g_out_source, dtype=torch.float))
@@ -333,14 +387,18 @@ class StarGAN(object):
                 out_class = self.C(x_real)
                 g_loss_class = cross_entropy_loss(input=out_class, target=style_idx_source)
 
+                # Target to original domain transfer
                 x_reconstituted = self.G(x_fake, label_source)
                 g_loss_reconstituted = F.l1_loss(x_reconstituted, x_real)
 
+                # Original to original domain transfer
                 x_fake_identity = self.G(x_real, label_source)
                 g_loss_fake_id = F.l1_loss(x_fake_identity, x_real)
 
+                # Backward and optimize
                 g_loss = g_loss_fake + self.cycle_loss_weight * g_loss_reconstituted + self.domclass_loss_weight * g_loss_class + self.identity_loss_weight * g_loss_fake_id
 
+                # Reset gradients
                 self.generator_optimizer.zero_grad()
                 self.discriminator_optimizer.zero_grad()
                 self.classifier_optimizer.zero_grad()
@@ -348,6 +406,7 @@ class StarGAN(object):
                 g_loss.backward()
                 self.generator_optimizer.step()
 
+                # Logging losses for Generator network
                 loss['G_loss_fake'] = g_loss_fake.item()
                 loss['G_loss_reconstituted'] = g_loss_reconstituted.item()
                 loss['G_loss_class'] = g_loss_class.item()
@@ -356,19 +415,21 @@ class StarGAN(object):
 
                 loss_to_print['Generator loss'] = g_loss.item()
 
-            if (i + 1) % self.log_freq == 0:
+            # Print info at a certain # of epochs
+            if (i + 1) % self.print_freq == 0:
                 estimated_time = datetime.now() - start_time
                 estimated_time = str(estimated_time)[:-7]
-                log = f'Elapsed [{estimated_time}] Epochs [{i+1}/{self.epochs}]'
+                to_print = f'Elapsed [{estimated_time}] Epochs [{i+1}/{self.epochs}]'
                 for tag, value in loss_to_print.items():
-                    log += f', {tag}: {value:.4f}'
-                print(log)
+                    to_print += f', {tag}: {value:.4f}'
+                print(to_print)
 
                 if self.use_tensorboard:
                     for tag, value in loss.items():
                         summary = tf.summary.scalar(tag, value, step=i + 1)
                         self.writer.flush()
 
+            # Transfer data for debugging at a certain # of epochs
             if (i + 1) % self.sample_freq == 0:
                 with torch.no_grad():
                     if self.source_style:
@@ -426,6 +487,7 @@ class StarGAN(object):
                         write_pianoroll_save_midis(npy_cycle_binary, f'{path_cycle}.mid')
                         np.save(path_cycle, npy_cycle_binary.reshape(npy_cycle_binary.shape[0], npy_cycle_binary.shape[3], npy_cycle_binary.shape[1], npy_cycle_binary.shape[2]))
 
+            # Save model checkpoints at a certain # of epochs
             if (i + 1) % self.model_freq == 0:
                 generator_path = os.path.join(self.models_directory, f'{i + 1}-G.ckpt')
                 discriminator_path = os.path.join(self.models_directory, f'{i + 1}-D.ckpt')
@@ -435,6 +497,7 @@ class StarGAN(object):
                 torch.save(self.C.state_dict(), classifier_path)
                 print(f'Models saved into {self.models_directory}.')
 
+            # Decay learning rates at a certain # of epochs
             if (i + 1) % self.lr_update_freq == 0 and (i + 1) > (self.epochs - self.lr_decay_epochs):
                 generator_lr -= (self.generator_lr / float(self.lr_decay_epochs))
                 discriminator_lr -= (self.discriminator_lr / float(self.lr_decay_epochs))
@@ -448,6 +511,7 @@ class StarGAN(object):
                 print(f'Learning rates decayed. Generator: {generator_lr}, Discriminator: {discriminator_lr}.')
 
     def test(self):
+        # Loading models
         print(f'Loading models from {self.test_epochs} epochs')
         generator_path = os.path.join(self.models_directory, f'{self.test_epochs}-G.ckpt')
         discriminator_path = os.path.join(self.models_directory, f'{self.test_epochs}-D.ckpt')
@@ -456,10 +520,12 @@ class StarGAN(object):
         self.D.load_state_dict(torch.load(discriminator_path, map_location=lambda storage, loc: storage))
         self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
 
+        # Set the original domain
         if self.source_style:
             source_style = self.source_style
         else:
             source_style = random.choice(styles)
+        # Load data from the test directory
         files = os.path.join(self.test_directory, source_style)
         files = librosa.util.find_files(files, ext='npy')
         npy_files = {}
@@ -470,6 +536,7 @@ class StarGAN(object):
                 npy_files[filename] = {}
             npy_files[filename] = file
         target_styles = self.target_style
+        # For each target domain, generate fake data (transfer from original to target domain) and save the results
         for style in target_styles:
             assert style in styles
             label_style = self.styles_encoder.transform([style])[0]
@@ -499,9 +566,11 @@ class StarGAN(object):
                     np.save(path_transfer, npy_transfer_binary.reshape(npy_transfer_binary.shape[0], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1], npy_transfer_binary.shape[2]))
 
     def classify(self):
+        # Loading Classifier model
         print("Classify files from " + str(self.classify_directory))
         classifier_path = os.path.join(self.models_directory, f'{self.classifier_epochs}-C.ckpt')
         self.C.load_state_dict(torch.load(classifier_path, map_location=lambda storage, loc: storage))
+        # Load data from the classify directory
         files = os.path.join(self.classify_directory)
         files = librosa.util.find_files(files, ext='npy')
         npy_files = {}
@@ -511,6 +580,7 @@ class StarGAN(object):
             if not npy_files.__contains__(filename):
                 npy_files[filename] = {}
             npy_files[filename] = file
+        # Run the Classifier to the data and decode the result
         with torch.no_grad():
             for filename, npy in npy_files.items():
                 npy_mod = torch.FloatTensor(npy).to(self.device)
@@ -519,7 +589,6 @@ class StarGAN(object):
                     file_class -= file_class.min(1, keepdim=True)[0]
                     file_class /= file_class.max(1, keepdim=True)[0]
                     file_class_style = self.styles_encoder.inverse_transform(file_class.cpu().numpy())
-                    print(file_class_style)
                     print(f'File {filename} is classified to {file_class_style[0]} style')
                 except:
                     npy_mod = npy_mod.view(1, npy_mod.size(0), npy_mod.size(1), npy_mod.size(2))
@@ -529,7 +598,7 @@ class StarGAN(object):
                     file_class_style = self.styles_encoder.inverse_transform(file_class.cpu().numpy())
                     print(f'File {filename} is classified to {file_class_style[0]} style')
 
-
+    # Function created for running some experiments
     def classifier_logs(self):
         print("Classify files from " + str(self.classify_directory))
         classifier_path = os.path.join(self.models_directory, f'{self.classifier_epochs}-C.ckpt')

@@ -46,6 +46,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
     # parser.add_argument('-f')
 
+    # Directories
     parser.add_argument(
         '--dataset_directory',
         type=str,
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--classify_directory',
         type=str,
-        default='data/test1/rock',
+        default='data/test1',
         help="path of the directory of the files to classify",
     )
     parser.add_argument(
@@ -88,6 +89,7 @@ if __name__ == '__main__':
         default='stargan_songs/results',
         help="samples are saved here",
     )
+    # Model
     parser.add_argument(
         '--cycle_loss_weight',
         type=float,
@@ -112,6 +114,7 @@ if __name__ == '__main__':
         default=0.1,
         help='sigma of gaussian noise for discriminators',
     )
+    # Train
     parser.add_argument(
         '--batch_size',
         type=int,
@@ -172,6 +175,7 @@ if __name__ == '__main__':
         default=None,
         help='resume train from # of epochs',
     )
+    # Test and classifier
     parser.add_argument(
         '--test_epochs',
         type=int,
@@ -196,6 +200,7 @@ if __name__ == '__main__':
         default="['rock', 'bossanova']",
         help='list of target styles for testing eg."[a,b]"',
     )
+    # Others
     parser.add_argument(
         '--num_workers',
         type=int,
@@ -215,11 +220,12 @@ if __name__ == '__main__':
         default=True,
         help='tensorboard to be used',
     )
+    # Frequencies
     parser.add_argument(
-        '--log_freq',
+        '--print_freq',
         type=int,
         default=10,
-        help="save log every log_freq epochs"
+        help="print info every print_freq epochs"
     )
     parser.add_argument(
         '--sample_freq',
