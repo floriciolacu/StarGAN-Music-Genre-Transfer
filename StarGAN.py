@@ -554,9 +554,10 @@ class StarGAN(object):
                     track_pass_threshold = (npy_transfer > 0.5)
                     npy_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
                     npy_transfer_binary = npy_transfer_binary.reshape(-1, npy_transfer_binary.shape[2], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1])
-                    name_origin = f'{source_style}-{style}_iter{self.test_epochs}_{filename}_origin'
-                    name_transfer = f'{source_style}-{style}_iter{self.test_epochs}_{filename}_transfer'
-                    path = os.path.join(self.results_directory, f'iter{self.test_epochs}')
+                    name_origin = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_origin'
+                    name_transfer = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_transfer'
+                    # path = os.path.join(self.results_directory, f'epoch{self.test_epochs}')
+                    path = f'testcase/'
                     path_origin = os.path.join(path, name_origin)
                     path_transfer = os.path.join(path, name_transfer)
                     print(f'saved: {name_origin}, {name_transfer}')

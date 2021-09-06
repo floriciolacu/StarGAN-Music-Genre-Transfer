@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dataset_directory',
         type=str,
-        default='data/rock_bossanova_funk_RnB',
+        default='data/RnB_bossanova_funk_rock',
         help="path of the dataset directory for train",
     )
     parser.add_argument(
