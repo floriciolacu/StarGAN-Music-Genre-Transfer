@@ -628,10 +628,6 @@ class StarGAN(object):
                 filename_split = filename.split("_")
                 if file_class_style[0] == filename_split[0]:
                     classfied_correctly += 1
-                if file_class_style[0] == "RnB" and filename_split[0] == "rock":
-                    classfied_correctly += 1
-                if file_class_style[0] == "rock" and filename_split[0] == "RnB":
-                    classfied_correctly += 1
         # print(classfied_correctly)
         percentage = classfied_correctly*100/nr_files
         print(f'Percentage of the files classified correctly: {percentage} %')
