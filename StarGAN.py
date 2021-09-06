@@ -554,13 +554,13 @@ class StarGAN(object):
                     track_pass_threshold = (npy_transfer > 0.5)
                     npy_transfer_binary = np.logical_and(track_is_max, track_pass_threshold)
                     npy_transfer_binary = npy_transfer_binary.reshape(-1, npy_transfer_binary.shape[2], npy_transfer_binary.shape[3], npy_transfer_binary.shape[1])
-                    name_origin = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_origin'
-                    name_transfer = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_transfer'
+                    name_original = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_original'
+                    name_target = f'{source_style}-{style}_epoch{self.test_epochs}_{filename}_target'
                     # path = os.path.join(self.results_directory, f'epoch{self.test_epochs}')
                     path = f'testcase/'
-                    path_origin = os.path.join(path, name_origin)
-                    path_transfer = os.path.join(path, name_transfer)
-                    print(f'saved: {name_origin}, {name_transfer}')
+                    path_origin = os.path.join(path, name_original)
+                    path_transfer = os.path.join(path, name_target)
+                    print(f'Saved files: {name_original}, {name_target}')
                     write_pianoroll_save_midis(npy.reshape(1, npy.shape[1], npy.shape[2], npy.shape[0]), f'{path_origin}.mid')
                     np.save(path_origin, npy.reshape(1, npy.shape[0], npy.shape[1], npy.shape[2]))
                     write_pianoroll_save_midis(npy_transfer_binary, f'{path_transfer}.mid')
